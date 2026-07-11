@@ -3,7 +3,7 @@ from flask import Flask, request
 import telebot
 
 # Vercel автоматически подтянет эти переменные из настроек, которые мы укажем позже
-TOKEN = os.getenv('8631602257:AAH3YqTkXzkJhhcDZps7YWeYq7PbTHSsq2k')
+TOKEN = os.getenv('BOT_TOKEN')
 ADMIN_CHAT_ID = os.getenv('ADMIN_CHAT_ID')
 
 bot = telebot.TeleBot(TOKEN, threaded=False)
