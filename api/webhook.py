@@ -1,15 +1,15 @@
 import os
-from flask import Flask, request
 import telebot
+from flask import Flask, request
 
-# Vercel автоматически подтянет эти переменные из настроек, которые мы укажем позже
+# Берем настройки из переменных окружения Vercel
 TOKEN = os.getenv('BOT_TOKEN')
 ADMIN_CHAT_ID = os.getenv('ADMIN_CHAT_ID')
 
 bot = telebot.TeleBot(TOKEN, threaded=False)
 app = Flask(__name__)
 
-# Маршрут, на который Telegram будет присылать сообщения
+# --- Маршрут для обработки вебхуков ---
 @app.route('/api/webhook', methods=['POST'])
 def webhook():
     if request.headers.get('content-type') == 'application/json':
@@ -20,23 +20,24 @@ def webhook():
     else:
         return 'Forbidden', 403
 
-# Стартовая страница (просто чтобы проверить, что сервер работает)
+# --- Основная страница для проверки (можно открыть в браузере) ---
 @app.route('/', methods=['GET'])
 def index():
-    return 'Бот предложки успешно запущен на Vercel!', 200
+    return 'Бот предложки работает!', 200
 
-# Логика бота: команда /start
+# --- ЛОГИКА БОТА ---
+
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
-    bot.reply_to(message, "Привет! Отправь сюда свой пост, мем или идею, и я передам это админам 🚀")
+    bot.reply_to(message, "Привет! Отправь пост, и я передам его админам.")
 
-# Логика бота: пересылка контента
 @bot.message_handler(content_types=['text', 'photo', 'video', 'document', 'animation', 'voice'])
 def forward_message(message):
     try:
-        # Пересылаем пост в чат админов
+        # Пересылка сообщения админу
         bot.forward_message(ADMIN_CHAT_ID, message.chat.id, message.message_id)
-        # Подтверждаем пользователю
-        bot.reply_to(message, "Спасибо! Твой пост отправлен в предложку.")
+        bot.reply_to(message, "✅ Спасибо! Пост отправлен админам.")
     except Exception as e:
-        print(f"Ошибка при пересылке: {e}")
+        bot.reply_to(message, f"❌ Ошибка: {str(e)}")
+
+# Это важно для Vercel: переменная 'app' должна существовать
