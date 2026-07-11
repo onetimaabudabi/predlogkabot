@@ -1,43 +1,57 @@
 import os
+import logging
 import telebot
 from flask import Flask, request
 
-# Берем настройки из переменных окружения Vercel
+# Настройка логирования
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Получение переменных из Vercel
 TOKEN = os.getenv('BOT_TOKEN')
 ADMIN_CHAT_ID = os.getenv('ADMIN_CHAT_ID')
 
 bot = telebot.TeleBot(TOKEN, threaded=False)
 app = Flask(__name__)
 
-# --- Маршрут для обработки вебхуков ---
 @app.route('/api/webhook', methods=['POST'])
 def webhook():
     if request.headers.get('content-type') == 'application/json':
-        json_string = request.get_data().decode('utf-8')
-        update = telebot.types.Update.de_json(json_string)
-        bot.process_new_updates([update])
-        return 'OK', 200
-    else:
-        return 'Forbidden', 403
+        try:
+            json_string = request.get_data().decode('utf-8')
+            update = telebot.types.Update.de_json(json_string)
+            bot.process_new_updates([update])
+            return 'OK', 200
+        except Exception as e:
+            logger.error(f"Ошибка обработки обновления: {e}")
+            return 'Error', 500
+    return 'Forbidden', 403
 
-# --- Основная страница для проверки (можно открыть в браузере) ---
 @app.route('/', methods=['GET'])
 def index():
-    return 'Бот предложки работает!', 200
+    return 'Бот активен!', 200
 
-# --- ЛОГИКА БОТА ---
-
+# Обработчик команды /start
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
-    bot.reply_to(message, "Привет! Отправь пост, и я передам его админам.")
+    logger.info(f"Команда /start от пользователя {message.chat.id}")
+    bot.reply_to(message, "Бот готов к работе!")
 
+# Обработчик всех остальных сообщений (текст, фото и т.д.)
 @bot.message_handler(content_types=['text', 'photo', 'video', 'document', 'animation', 'voice'])
 def forward_message(message):
+    logger.info(f"Получено сообщение от {message.chat.id}. Тип: {message.content_type}")
     try:
-        # Пересылка сообщения админу
-        bot.forward_message(ADMIN_CHAT_ID, message.chat.id, message.message_id)
-        bot.reply_to(message, "✅ Спасибо! Пост отправлен админам.")
-    except Exception as e:
-        bot.reply_to(message, f"❌ Ошибка: {str(e)}")
+        if not ADMIN_CHAT_ID:
+            logger.error("ADMIN_CHAT_ID не задан в переменных окружения!")
+            return
 
-# Это важно для Vercel: переменная 'app' должна существовать
+        bot.forward_message(ADMIN_CHAT_ID, message.chat.id, message.message_id)
+        logger.info("Сообщение успешно переслано админу")
+    except Exception as e:
+        logger.error(f"Критическая ошибка при пересылке: {e}")
+        bot.reply_to(message, "Произошла ошибка при отправке поста.")
+
+# Это нужно для работы Vercel
+if __name__ == "__main__":
+    app.run()
